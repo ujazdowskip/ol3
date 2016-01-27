@@ -367,6 +367,22 @@ ol.tilegrid.TileGrid.prototype.getTileCoordForCoordAndResolution = function(coor
       coordinate[0], coordinate[1], resolution, false, opt_tileCoord);
 };
 
+/**
+ * Get the tile coordinates for the given map coordinate and resolution and radius.  This
+ * method considers that coordinates that intersect tile boundaries should be
+ * assigned the higher tile coordinate.
+ *
+ * @param {ol.Coordinate} coordinate Coordinate.
+ * @param {number} resolution Resolution.
+ * @param {number} radius Radius.
+ * @param {ol.TileCoord=} opt_tileCoord Destination ol.TileCoord object.
+ * @return {ol.TileCoord} Tile coordinate.
+ * @api
+ */
+ol.tilegrid.TileGrid.prototype.getTileCoordForCoordAndResolutionAndRadius = function(coordinate, resolution, radius, opt_tileCoord) {
+    //console.log('getting tile coords with radius');
+};
+
 
 /**
  * @param {number} x X.
