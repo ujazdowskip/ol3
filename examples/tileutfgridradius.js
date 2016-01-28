@@ -80,24 +80,14 @@ var displayCountryInfo = function(coordinate) {
     });
 };
 
-/*map.on('pointermove', function(evt) {
-  if (evt.dragging) {
-    return;
-  }
-  var coordinate = map.getEventCoordinate(evt.originalEvent);
-  displayCountryInfo(coordinate);
-});*/
-
 map.on('click', function(evt) {
-  //displayCountryInfo(evt.coordinate);
-  gridSource.forDataAtCoordinateAndResolutionAndRadius(evt.coordinate, view.getResolution(), 56,
+  gridSource.forDataAtCoordinateAndResolutionAndRadius(evt.coordinate, view.getResolution(), 20,
     function(data) {
-      //console.log('OMG radius function');
+      console.log('data within radius: ', data);
     });
 
   gridSource.forDataAtCoordinateAndResolution(evt.coordinate, view.getResolution(),
     function(data) {
-      //console.log('utfgridSource: ', gridSource);
       console.log('data: ', data);
     });
 });

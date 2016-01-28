@@ -115,12 +115,16 @@ ol.source.TileUTFGrid.prototype.forDataAtCoordinateAndResolutionAndRadius = func
     coordinate, resolution, radius, callback, opt_this, opt_request) {
 
   if (this.tileGrid) {
-    //console.log('this.tileGrid: ', this.tileGrid);
-    var tileCoord = this.tileGrid.getTileCoordForCoordAndResolutionAndRadius(
-        coordinate, resolution, radius);
-    /*var tile = /** @type {!ol.source.TileUTFGridTile_} * /(this.getTile(
+    var tileCoord = this.tileGrid.getTileCoordForCoordAndResolution(
+        coordinate, resolution);
+
+    //TODO for now data are witin radius only on one tile!!!
+    //if event is near tile border this fn could return data from other tiles also
+    //tileGrid.getTilesForCoordAndResolutionAndRadius ?
+
+    var tile = /** @type {!ol.source.TileUTFGridTile_} */(this.getTile(
         tileCoord[0], tileCoord[1], tileCoord[2], 1, this.getProjection()));
-    tile.forDataAtCoordinate(coordinate, callback, opt_this, opt_request);*/
+    tile.forDataAtCoordinateWithRadius(coordinate, radius, callback, opt_this, opt_request);
   } else {
     if (opt_request === true) {
       goog.async.nextTick(function() {
@@ -300,9 +304,9 @@ ol.source.TileUTFGridTile_.prototype.getImage = function(opt_context) {
 /**
  * Synchronously returns data at given coordinate (if available).
  * @param {ol.Coordinate} coordinate Coordinate.
- * @return {Object} The data.
+ * @return {Object} The data. //TODO returns array of data
  */
-/*ol.source.TileUTFGridTile_.prototype.getData = function(coordinate) {
+ol.source.TileUTFGridTile_.prototype.getData = function(coordinate) {
   if (!this.grid_ || !this.keys_ || !this.data_) {
     return null;
   }
@@ -327,9 +331,85 @@ ol.source.TileUTFGridTile_.prototype.getImage = function(opt_context) {
   code -= 32;
 
   return (code in this.keys_) ? this.data_[this.keys_[code]] : null;
-};*/
+};
 
-function mapCode(code) {
+/**
+ * Synchronously returns data at given coordinate (if available).
+ * @param {ol.Coordinate} coordinate Coordinate.
+ * @param {number} radius Radius.
+ * @return {Object} The data. //TODO returns array of data
+ */
+ol.source.TileUTFGridTile_.prototype.getDataWithinRadius = function(coordinate, radius) {
+
+  //TODO refactor
+
+  if (!this.grid_ || !this.keys_ || !this.data_) {
+    return null;
+  }
+
+
+  if(typeof radius === 'undefined') {
+    radius = 4;
+  }
+
+  var cellsCount = Math.floor(radius / 4);
+
+  if(cellsCount % 2 === 0) {
+    cellsCount++;
+  }
+
+  var xRelative = (coordinate[0] - this.extent_[0]) /
+      (this.extent_[2] - this.extent_[0]);
+  var yRelative = (coordinate[1] - this.extent_[1]) /
+      (this.extent_[3] - this.extent_[1]);
+
+  var rows = [];
+  var codes = [];
+  var begIdx = -Math.floor(cellsCount / 2);
+  var endIdx = cellsCount + begIdx;
+  var centerCellYIdx = Math.floor((1 - yRelative) * this.grid_.length);
+
+  if(cellsCount > 1) {
+    for(var i = begIdx, len = cellsCount - begIdx; i < endIdx; i++) {
+      rows.push(this.grid_[centerCellYIdx + i]);
+    }
+  } else {
+      rows.push(this.grid_[centerCellYIdx]);
+  }
+
+  rows = rows.filter(function(row) {
+    return goog.isString(row);
+  });
+
+
+  rows.forEach(function(row) {
+    var centerCellXIdx = Math.floor(xRelative * row.length);
+
+    if(cellsCount > 1) {
+      for(var i = begIdx, len = cellsCount - begIdx; i < endIdx; i++) {
+        codes.push(row.charCodeAt(centerCellXIdx + i));
+      }
+    } else {
+        codes.push(row.charCodeAt(centerCellXIdx));
+    }
+  });
+
+  codes = codes.filter(function(itm, i){
+    return codes.indexOf(itm) === i;
+  });
+
+  return codes.map(this.mapCode, this).filter(function(el) {
+    return el;
+  });
+};
+
+/**
+ * Maps the code from number to data in the grid.
+ * @param {number} code Code.
+ * @return {Object|null} The data.
+ */
+ol.source.TileUTFGridTile_.prototype.mapCode = function(code) {
+
   if (code >= 93) {
     code--;
   }
@@ -339,45 +419,6 @@ function mapCode(code) {
   code -= 32;
 
   return (code in this.keys_) ? this.data_[this.keys_[code]] : null;
-}
-
-ol.source.TileUTFGridTile_.prototype.getData = function(coordinate) {
-  if (!this.grid_ || !this.keys_ || !this.data_) {
-    return null;
-  }
-  var xRelative = (coordinate[0] - this.extent_[0]) /
-      (this.extent_[2] - this.extent_[0]);
-  var yRelative = (coordinate[1] - this.extent_[1]) /
-      (this.extent_[3] - this.extent_[1]);
-
-  var rows = [];
-  //var row = this.grid_[Math.floor((1 - yRelative) * this.grid_.length)];
-  rows.push(this.grid_[Math.floor((1 - yRelative) * this.grid_.length) - 1]);
-  rows.push(this.grid_[Math.floor((1 - yRelative) * this.grid_.length)]);
-  rows.push(this.grid_[Math.floor((1 - yRelative) * this.grid_.length) + 1]);
-
-  rows = rows.filter(function(row) {
-    return goog.isString(row);
-  });
-
-  var codes = [];
-
-  rows.forEach(function(row) {
-    codes.push(row.charCodeAt(Math.floor(xRelative * row.length) - 1));
-    codes.push(row.charCodeAt(Math.floor(xRelative * row.length)));
-    codes.push(row.charCodeAt(Math.floor(xRelative * row.length) + 1));
-  });
-
-  codes = codes.filter(function(itm, i){
-    //TODO check if I coudl ise Array.prototye.filter
-    return codes.indexOf(itm) === i;
-  });
-
-  var result = codes.map(mapCode, this).filter(function(el) {
-    return el;
-  });
-
-  return result;
 };
 
 
@@ -404,6 +445,35 @@ ol.source.TileUTFGridTile_.prototype.forDataAtCoordinate = function(coordinate, 
       }, this);
     } else {
       callback.call(opt_this, this.getData(coordinate));
+    }
+  }
+};
+
+/**
+ * Calls the callback (synchronously by default) with the available data
+ * for given coordinate (or `null` if not yet loaded).
+ * @param {ol.Coordinate} coordinate Coordinate.
+ * @param {number} radius Radius.
+ * @param {function(this: T, Object)} callback Callback.
+ * @param {T=} opt_this The object to use as `this` in the callback.
+ * @param {boolean=} opt_request If `true` the callback is always async.
+ *                               The tile data is requested if not yet loaded.
+ * @template T
+ */
+ol.source.TileUTFGridTile_.prototype.forDataAtCoordinateWithRadius = function(coordinate, radius, callback, opt_this, opt_request) {
+
+  if (this.state == ol.TileState.IDLE && opt_request === true) {
+    goog.events.listenOnce(this, goog.events.EventType.CHANGE, function(e) {
+      callback.call(opt_this, this.getDataWithinRadius(coordinate, radius));
+    }, false, this);
+    this.loadInternal_();
+  } else {
+    if (opt_request === true) {
+      goog.async.nextTick(function() {
+        callback.call(opt_this, this.getDataWithinRadius(coordinate, radius));
+      }, this);
+    } else {
+      callback.call(opt_this, this.getDataWithinRadius(coordinate, radius));
     }
   }
 };
